@@ -62,14 +62,18 @@ class VRM4URENDER_API UVRM4U_RenderSubsystem : public UEngineSubsystem
 	GENERATED_BODY()
 
 	FDelegateHandle HandleTearDown;
+	FDelegateHandle PostOpaqueHandle;
+	FDelegateHandle OverlayHandle;
 	bool bInitPIE = false;
 	bool bIsPlay = false;
+	bool bDelegatesRegistered = false;
 
 public:
 
 	bool bUsePostRenderBasePass = false;
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
 
 	void RenderPre(FRDGBuilder& GraphBuilder);
 	void RenderPost(FRDGBuilder& GraphBuilder);

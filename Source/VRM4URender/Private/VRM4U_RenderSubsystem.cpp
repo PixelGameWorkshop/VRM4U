@@ -87,10 +87,30 @@ void UVRM4U_RenderSubsystem::Initialize(FSubsystemCollectionBase& Collection) {
 	Super::Initialize(Collection);
 
 	SceneViewExtension = FSceneViewExtensions::NewExtension<FVrmSceneViewExtension>();
-	GetRendererModule().RegisterPostOpaqueRenderDelegate(FPostOpaqueRenderDelegate::CreateUObject(this, &UVRM4U_RenderSubsystem::OnPostOpaque));
-	GetRendererModule().RegisterOverlayRenderDelegate(FPostOpaqueRenderDelegate::CreateUObject(this, &UVRM4U_RenderSubsystem::OnOverlay));
-	
+
+	// WORKAROUND: Delay delegate registration to avoid interfering with object lifecycle
+	// during engine initialization. Register only when actually needed (AddCaptureTexture).
+	// This prevents infinite loops when other plugins (e.g., ShaderWorld) create objects
+	// while waiting in IsReadyForFinishDestroy() and the rendering pipeline triggers our delegates.
+	// GetRendererModule().RegisterPostOpaqueRenderDelegate(FPostOpaqueRenderDelegate::CreateUObject(this, &UVRM4U_RenderSubsystem::OnPostOpaque));
+	// GetRendererModule().RegisterOverlayRenderDelegate(FPostOpaqueRenderDelegate::CreateUObject(this, &UVRM4U_RenderSubsystem::OnOverlay));
+
 	//GetRendererModule().GetResolvedSceneColorCallbacks().AddUObject(this, &UVRM4U_RenderSubsystem::OnResolvedSceneColor_RenderThread);
+}
+
+void UVRM4U_RenderSubsystem::Deinitialize() {
+	// Unregister render delegates if they were registered
+	if (bDelegatesRegistered) {
+		if (PostOpaqueHandle.IsValid()) {
+			GetRendererModule().RemovePostOpaqueRenderDelegate(PostOpaqueHandle);
+		}
+		if (OverlayHandle.IsValid()) {
+			GetRendererModule().RemoveOverlayRenderDelegate(OverlayHandle);
+		}
+		bDelegatesRegistered = false;
+	}
+
+	Super::Deinitialize();
 }
 
 void UVRM4U_RenderSubsystem::OnResolvedSceneColor_RenderThread(FRDGBuilder& GraphBuilder, const FSceneTextures& SceneTextures) {
@@ -288,6 +308,13 @@ void UVRM4U_RenderSubsystem::RenderPost(FRDGBuilder& GraphBuilder) {
 
 void UVRM4U_RenderSubsystem::AddCaptureTexture(UTextureRenderTarget2D* Texture, EVRM4U_CaptureSource CaptureSource) {
 	if (Texture == nullptr) return;
+
+	// Lazy initialize render delegates when first capture texture is added
+	if (!bDelegatesRegistered) {
+		PostOpaqueHandle = GetRendererModule().RegisterPostOpaqueRenderDelegate(FPostOpaqueRenderDelegate::CreateUObject(this, &UVRM4U_RenderSubsystem::OnPostOpaque));
+		OverlayHandle = GetRendererModule().RegisterOverlayRenderDelegate(FPostOpaqueRenderDelegate::CreateUObject(this, &UVRM4U_RenderSubsystem::OnOverlay));
+		bDelegatesRegistered = true;
+	}
 
 	CaptureList.FindOrAdd(Texture) = CaptureSource;
 
