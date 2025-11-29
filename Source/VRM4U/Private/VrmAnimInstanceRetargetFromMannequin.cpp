@@ -289,12 +289,19 @@ void FVrmAnimInstanceRetargetFromMannequinProxy::UpdateAnimationNode(const FAnim
 void FVrmAnimInstanceRetargetFromMannequinProxy::PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds) {
 	Super::PreUpdate(InAnimInstance, DeltaSeconds);
 
+	UVrmAnimInstanceRetargetFromMannequin* VrmAnimInstance = Cast<UVrmAnimInstanceRetargetFromMannequin>(InAnimInstance);
 
 	if (Node_Retarget.Get()) {
 		auto node = Node_Retarget.Get();
 
 		node->IKRetargeterAsset = Retargeter.Get();
-		//node->SourceMeshComponent = InAnimInstance->SrcSkeletalMeshComponent; // null ok
+
+		// 소스 메시 컴포넌트 설정
+		if (VrmAnimInstance && VrmAnimInstance->SrcSkeletalMeshComponent)
+		{
+			node->RetargetFrom = ERetargetSourceMode::CustomSkeletalMeshComponent;
+			node->SourceMeshComponent = VrmAnimInstance->SrcSkeletalMeshComponent;
+		}
 
 		FAnimationInitializeContext InitContext(this);
 
